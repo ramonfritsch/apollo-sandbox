@@ -1,4 +1,4 @@
-import { gql, UserInputError } from 'apollo-server-micro';
+import { ApolloError, gql, UserInputError } from 'apollo-server-micro';
 // import { applyMiddleware } from 'graphql-middleware';
 import { makeExecutableSchema } from 'graphql-tools';
 
@@ -24,6 +24,9 @@ const typeDefs = gql`
 
 	type Query {
 		allProjects: [Project!]!
+		errorQuery: Project!
+		redirectErrorQuery: Project!
+		notFoundErrorQuery: Project!
 	}
 
 	input UpdateTodoInput {
@@ -48,6 +51,22 @@ const typeDefs = gql`
 		deleteTodo(input: DeleteTodoInput!): Boolean!
 	}
 `;
+
+class RedirectError extends ApolloError {
+	constructor(message, properties) {
+		super(message, 'REDIRECT', properties);
+
+		Object.defineProperty(this, 'name', { value: 'RedirectError' });
+	}
+}
+
+class NotFoundError extends ApolloError {
+	constructor(message, properties) {
+		super(message, 'NOT_FOUND', properties);
+
+		Object.defineProperty(this, 'name', { value: 'NotFoundError' });
+	}
+}
 
 const TODOS = [
 	{
@@ -119,6 +138,12 @@ const resolvers = {
 	},
 	Query: {
 		allProjects: () => PROJECTS,
+		errorQuery: () => new Error('Some error'),
+		redirectErrorQuery: () =>
+			new RedirectError('Redirect error', {
+				url: 'https://google.com/',
+			}),
+		notFoundErrorQuery: () => new NotFoundError('Not found error'),
 	},
 	Mutation: {
 		updateTodo: (parent, { input: { _id, done } }) => {

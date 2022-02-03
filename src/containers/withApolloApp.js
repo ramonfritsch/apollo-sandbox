@@ -1,4 +1,5 @@
-import { ApolloClient, ApolloProvider, InMemoryCache } from '@apollo/client';
+import { ApolloClient, ApolloProvider, from, InMemoryCache } from '@apollo/client';
+import { onError } from '@apollo/client/link/error';
 import 'isomorphic-unfetch';
 import React, { useMemo } from 'react';
 import { wrapDisplayName } from 'recompose';
@@ -36,10 +37,22 @@ function createApolloClient(ctx, initialState) {
 	} else {
 		const { HttpLink } = require('@apollo/client/link/http');
 
-		link = new HttpLink({
-			uri: `/api/graphql/`,
-			credentials: 'include',
-		});
+		link = from([
+			onError(({ graphQLErrors, response }) => {
+				for (let k in graphQLErrors) {
+					const graphQLError = graphQLErrors[k];
+
+					if (graphQLError.extensions.code === 'REDIRECT') {
+						window.location = graphQLError.extensions.url;
+						response.errors = null;
+					}
+				}
+			}),
+			new HttpLink({
+				uri: `/api/graphql/`,
+				credentials: 'include',
+			}),
+		]);
 	}
 
 	const cache = new InMemoryCache(cacheOptions).restore(initialState);
@@ -79,7 +92,7 @@ const withApolloApp = (AppComponent) => {
 
 		ctx.apolloClient = apolloClient;
 
-		let initialAppProps = {};
+		let initialAppProps = { pageProps: {} };
 		if (AppComponent.getInitialProps) {
 			initialAppProps = await AppComponent.getInitialProps(appContext);
 		}
@@ -88,7 +101,7 @@ const withApolloApp = (AppComponent) => {
 		if (!process.browser) {
 			// When redirecting, the response is finished.
 			// No point in continuing to render
-			if (ctx.res && ctx.res.finished) {
+			if (res && res.finished) {
 				return initialAppProps;
 			}
 
@@ -100,6 +113,19 @@ const withApolloApp = (AppComponent) => {
 				// Prevent Apollo Client GraphQL errors from crashing SSR.
 				// Handle them in components via the data.error prop:
 				// https://www.apollographql.com/docs/react/api/react-apollo.html#graphql-query-data-error
+				for (let k in error.graphQLErrors) {
+					const graphQLError = error.graphQLErrors[k];
+
+					if (graphQLError.extensions.code === 'REDIRECT') {
+						res.writeHead(302, {
+							Location: graphQLError.extensions.url,
+						});
+						res.end();
+
+						return {};
+					}
+				}
+
 				// eslint-disable-next-line no-console
 				console.error('Error while running `getDataFromTree`', error);
 			}

@@ -1,4 +1,5 @@
 import { gql, useApolloClient, useQuery } from '@apollo/client';
+import Link from 'next/link';
 import { useCallback } from 'react';
 
 const Item = ({ projectID, todo }) => {
@@ -83,8 +84,6 @@ const Item = ({ projectID, todo }) => {
 			},
 		});
 
-		console.log('evict', client.cache.identify(todo));
-
 		client.cache.evict(client.cache.identify(todo));
 	}, [todo, projectID]);
 
@@ -144,6 +143,29 @@ const Page = () => {
 						</ul>
 					</li>
 				))}
+			</ul>
+
+			<ul>
+				<li>
+					<Link href="/error">
+						<a>Load error page</a>
+					</Link>
+				</li>
+				<li>
+					<Link href="/error-action">
+						<a>Error action page</a>
+					</Link>
+				</li>
+				<li>
+					<Link href="/error-redirect">
+						<a>Error redirect page</a>
+					</Link>
+				</li>
+				<li>
+					<Link href="/error-not-found">
+						<a>Error not found page</a>
+					</Link>
+				</li>
 			</ul>
 		</div>
 	);
